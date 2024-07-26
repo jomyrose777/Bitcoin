@@ -10,6 +10,7 @@ import nltk
 import pytz
 from datetime import datetime
 import streamlit.components.v1 as components
+from streamlit.cache import cache
 
 # Set up local path for NLTK data
 nltk.data.path.append('/path/to/your/project/nltk_data')
@@ -27,14 +28,28 @@ est = pytz.timezone('America/New_York')
 def to_est(dt):
     return dt.tz_convert(est) if dt.tzinfo else est.localize(dt)
 
-# Fetch live data from Yahoo Finance
-data = yf.download(ticker, period='1d', interval='1m')
+@cache
+def fetch_data():
+    try:
+        # Fetch live data from Yahoo Finance
+        data = yf.download(ticker, period='1d', interval='1m')
+        
+        # Convert index to EST if it's not already timezone-aware
+        if data.index.tzinfo is None:
+            data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
+        else:
+            data.index = data.index.tz_convert(est)
+        
+        return data
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame in case of error
 
-# Convert index to EST if it's not already timezone-aware
-if data.index.tzinfo is None:
-    data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
-else:
-    data.index = data.index.tz_convert(est)
+# Fetch data
+data = fetch_data()
+
+if data.empty:
+    st.stop()  # Stop execution if data fetching failed
 
 # Calculate technical indicators
 data['RSI'] = data['Close'].rolling(window=14).apply(lambda x: (x/x.shift(1)-1).mean())
