@@ -9,6 +9,7 @@ import nltk
 import pytz
 from datetime import datetime
 import streamlit.components.v1 as components
+import plotly.graph_objects as go
 
 nltk.download('vader_lexicon')
 
@@ -100,6 +101,19 @@ for _, row in signals_df.iterrows():
 
 # Plot the price chart
 st.line_chart(data['Close'])
+
+# Add candlestick chart using plotly
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'])])
+
+fig.update_layout(title='Bitcoin Candlestick Chart',
+                  xaxis_title='Date',
+                  yaxis_title='Price')
+
+st.plotly_chart(fig)
 
 # Add JavaScript to auto-refresh the Streamlit app every 60 seconds
 components.html("""
