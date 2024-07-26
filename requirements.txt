@@ -3,3 +3,4 @@ yfinance
 nltk
 scikit-learn
 pytz
+plotly
