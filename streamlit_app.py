@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from nltk.sentiment import SentimentIntensityAnalyzer
@@ -9,9 +10,12 @@ import nltk
 import pytz
 from datetime import datetime
 import streamlit.components.v1 as components
-import plotly.graph_objects as go
 
-nltk.download('vader_lexicon')
+# Set up local path for NLTK data
+nltk.data.path.append('/path/to/your/project/nltk_data')
+
+# Initialize SentimentIntensityAnalyzer
+sia = SentimentIntensityAnalyzer()
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -42,7 +46,6 @@ data['Stoch_OSC'] = (data['Close'] - data['Close'].rolling(window=14).min()) / (
 data['Force_Index'] = data['Close'].diff() * data['Volume']
 
 # Perform sentiment analysis using nltk
-sia = SentimentIntensityAnalyzer()
 data['Sentiment'] = data['Close'].apply(lambda x: sia.polarity_scores(str(x))['compound'])
 
 # Drop rows with NaN values
@@ -99,19 +102,17 @@ for _, row in signals_df.iterrows():
         formatted_sell_date = sell_date.strftime('%Y-%m-%d %I:%M %p')  # Convert to EST and format
         st.write(f"Suggested Hold Until: **{formatted_sell_date}**")
 
-# Plot the price chart
-st.line_chart(data['Close'])
-
-# Add candlestick chart using plotly
+# Plot the price chart with candlesticks
 fig = go.Figure(data=[go.Candlestick(x=data.index,
                                      open=data['Open'],
                                      high=data['High'],
                                      low=data['Low'],
                                      close=data['Close'])])
 
-fig.update_layout(title='Bitcoin Candlestick Chart',
+fig.update_layout(title='Bitcoin Price Candlestick Chart',
                   xaxis_title='Date',
-                  yaxis_title='Price')
+                  yaxis_title='Price (USD)',
+                  xaxis_rangeslider_visible=False)
 
 st.plotly_chart(fig)
 
