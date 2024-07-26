@@ -10,7 +10,6 @@ import nltk
 import pytz
 from datetime import datetime
 import streamlit.components.v1 as components
-from streamlit.cache import cache
 
 # Set up local path for NLTK data
 nltk.data.path.append('/path/to/your/project/nltk_data')
@@ -28,7 +27,7 @@ est = pytz.timezone('America/New_York')
 def to_est(dt):
     return dt.tz_convert(est) if dt.tzinfo else est.localize(dt)
 
-@cache
+@st.cache
 def fetch_data():
     try:
         # Fetch live data from Yahoo Finance
