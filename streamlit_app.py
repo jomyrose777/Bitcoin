@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from nltk.sentiment import SentimentIntensityAnalyzer
@@ -11,11 +10,7 @@ import pytz
 from datetime import datetime
 import streamlit.components.v1 as components
 
-# Set up local path for NLTK data
-nltk.data.path.append('/path/to/your/project/nltk_data')
-
-# Initialize SentimentIntensityAnalyzer
-sia = SentimentIntensityAnalyzer()
+nltk.download('vader_lexicon')
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -27,28 +22,14 @@ est = pytz.timezone('America/New_York')
 def to_est(dt):
     return dt.tz_convert(est) if dt.tzinfo else est.localize(dt)
 
-@st.cache
-def fetch_data():
-    try:
-        # Fetch live data from Yahoo Finance
-        data = yf.download(ticker, period='1d', interval='1m')
-        
-        # Convert index to EST if it's not already timezone-aware
-        if data.index.tzinfo is None:
-            data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
-        else:
-            data.index = data.index.tz_convert(est)
-        
-        return data
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
-        return pd.DataFrame()  # Return an empty DataFrame in case of error
+# Fetch live data from Yahoo Finance
+data = yf.download(ticker, period='1d', interval='1m')
 
-# Fetch data
-data = fetch_data()
-
-if data.empty:
-    st.stop()  # Stop execution if data fetching failed
+# Convert index to EST if it's not already timezone-aware
+if data.index.tzinfo is None:
+    data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
+else:
+    data.index = data.index.tz_convert(est)
 
 # Calculate technical indicators
 data['RSI'] = data['Close'].rolling(window=14).apply(lambda x: (x/x.shift(1)-1).mean())
@@ -60,6 +41,7 @@ data['Stoch_OSC'] = (data['Close'] - data['Close'].rolling(window=14).min()) / (
 data['Force_Index'] = data['Close'].diff() * data['Volume']
 
 # Perform sentiment analysis using nltk
+sia = SentimentIntensityAnalyzer()
 data['Sentiment'] = data['Close'].apply(lambda x: sia.polarity_scores(str(x))['compound'])
 
 # Drop rows with NaN values
@@ -116,19 +98,8 @@ for _, row in signals_df.iterrows():
         formatted_sell_date = sell_date.strftime('%Y-%m-%d %I:%M %p')  # Convert to EST and format
         st.write(f"Suggested Hold Until: **{formatted_sell_date}**")
 
-# Plot the price chart with candlesticks
-fig = go.Figure(data=[go.Candlestick(x=data.index,
-                                     open=data['Open'],
-                                     high=data['High'],
-                                     low=data['Low'],
-                                     close=data['Close'])])
-
-fig.update_layout(title='Bitcoin Price Candlestick Chart',
-                  xaxis_title='Date',
-                  yaxis_title='Price (USD)',
-                  xaxis_rangeslider_visible=False)
-
-st.plotly_chart(fig)
+# Plot the price chart
+st.line_chart(data['Close'])
 
 # Add JavaScript to auto-refresh the Streamlit app every 60 seconds
 components.html("""
@@ -137,4 +108,4 @@ setTimeout(function(){
    window.location.reload();
 }, 60000);  // Refresh every 60 seconds
 </script>
-""", height=0)
+""", height=0) 
