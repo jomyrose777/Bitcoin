@@ -1,3 +1,4 @@
+# Import necessary libraries
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -11,6 +12,7 @@ from datetime import datetime
 import streamlit.components.v1 as components
 import scipy.stats as stats
 
+# Download NLTK data for sentiment analysis
 nltk.download('vader_lexicon')
 
 # Define the ticker symbol for Bitcoin
@@ -71,13 +73,23 @@ data = detect_doji(data)
 # Calculate trendlines using linear regression
 def calculate_trendline(data, start_date, end_date):
     subset = data[(data.index >= start_date) & (data.index <= end_date)]
+    if subset.empty:
+        return None, None  # Return None if there is no data
     x = np.arange(len(subset))
     y = subset['Close'].values
     slope, intercept, _, _, _ = stats.linregress(x, y)
     return slope, intercept
 
 # Example: Trendline calculation for a specific period
-slope, intercept = calculate_trendline(data, '2023-01-01', '2023-07-01')
+start_date = '2023-01-01'
+end_date = '2023-07-01'
+slope, intercept = calculate_trendline(data, start_date, end_date)
+
+# Check if trendline calculation returned valid values
+if slope is not None and intercept is not None:
+    trendline_info = f"Trendline Slope: {slope:.4f}, Intercept: {intercept:.4f}"
+else:
+    trendline_info = "No data available for the specified trendline calculation period."
 
 # Define machine learning model using scikit-learn
 X = pd.concat([data['Close'], data['RSI'], data['BB_Middle'], data['BB_Upper'], data['BB_Lower'], data['MACD'], data['Stoch_OSC'], data['Force_Index'], data['Sentiment']], axis=1)
@@ -134,7 +146,7 @@ for _, row in signals_df.iterrows():
 st.write(f"Fibonacci Levels: {fib_levels}")
 
 # Display trendline information
-st.write(f"Trendline Slope: {slope}, Intercept: {intercept}")
+st.write(trendline_info)
 
 # Plot the price chart
 st.line_chart(data['Close'])
