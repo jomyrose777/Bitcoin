@@ -9,6 +9,7 @@ import nltk
 import pytz
 from datetime import datetime
 import streamlit.components.v1 as components
+import scipy.stats as stats
 
 nltk.download('vader_lexicon')
 
@@ -46,6 +47,37 @@ data['Sentiment'] = data['Close'].apply(lambda x: sia.polarity_scores(str(x))['c
 
 # Drop rows with NaN values
 data.dropna(inplace=True)
+
+# Advanced Analysis Functions
+
+# Calculate Fibonacci retracement levels
+def fibonacci_retracement(high, low):
+    diff = high - low
+    levels = [high - diff * ratio for ratio in [0.236, 0.382, 0.5, 0.618, 0.786]]
+    return levels
+
+high = data['High'].max()
+low = data['Low'].min()
+fib_levels = fibonacci_retracement(high, low)
+
+# Detect Doji candlestick patterns
+def detect_doji(data):
+    threshold = 0.001  # Define a threshold for identifying Doji
+    data['Doji'] = abs(data['Close'] - data['Open']) / (data['High'] - data['Low']) < threshold
+    return data
+
+data = detect_doji(data)
+
+# Calculate trendlines using linear regression
+def calculate_trendline(data, start_date, end_date):
+    subset = data[(data.index >= start_date) & (data.index <= end_date)]
+    x = np.arange(len(subset))
+    y = subset['Close'].values
+    slope, intercept, _, _, _ = stats.linregress(x, y)
+    return slope, intercept
+
+# Example: Trendline calculation for a specific period
+slope, intercept = calculate_trendline(data, '2023-01-01', '2023-07-01')
 
 # Define machine learning model using scikit-learn
 X = pd.concat([data['Close'], data['RSI'], data['BB_Middle'], data['BB_Upper'], data['BB_Lower'], data['MACD'], data['Stoch_OSC'], data['Force_Index'], data['Sentiment']], axis=1)
@@ -98,8 +130,18 @@ for _, row in signals_df.iterrows():
         formatted_sell_date = sell_date.strftime('%Y-%m-%d %I:%M %p')  # Convert to EST and format
         st.write(f"Suggested Hold Until: **{formatted_sell_date}**")
 
+# Display Fibonacci retracement levels
+st.write(f"Fibonacci Levels: {fib_levels}")
+
+# Display trendline information
+st.write(f"Trendline Slope: {slope}, Intercept: {intercept}")
+
 # Plot the price chart
 st.line_chart(data['Close'])
+
+# Plot Doji patterns on the chart
+doji_dates = data[data['Doji']].index
+st.write(f"Doji Patterns Detected on: {doji_dates}")
 
 # Add JavaScript to auto-refresh the Streamlit app every 60 seconds
 components.html("""
@@ -108,4 +150,4 @@ setTimeout(function(){
    window.location.reload();
 }, 60000);  // Refresh every 60 seconds
 </script>
-""", height=0) 
+""", height=0)
