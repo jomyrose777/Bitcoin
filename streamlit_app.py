@@ -107,8 +107,10 @@ def moving_averages_summary(data):
 moving_averages = moving_averages_summary(data)
 
 # Generate buy/sell signals based on indicators and moving averages
-def generate_signals(indicators, moving_averages):
+def generate_signals(indicators, moving_averages, data):
     signals = {}
+    signals['timestamp'] = to_est(data.index[-1]).strftime('%Y-%m-%d %I:%M:%S %p')
+    
     if indicators['RSI'] < 30:
         signals['RSI'] = 'Buy'
     elif indicators['RSI'] > 70:
@@ -137,16 +139,27 @@ def generate_signals(indicators, moving_averages):
     
     return signals
 
-signals = generate_signals(indicators, moving_averages)
+signals = generate_signals(indicators, moving_averages, data)
+
+# Log signals
+log_file = 'signals_log.csv'
+try:
+    logs = pd.read_csv(log_file)
+except FileNotFoundError:
+    logs = pd.DataFrame(columns=['timestamp', 'RSI', 'MACD', 'ADX', 'CCI', 'MA'])
+
+new_log = pd.DataFrame([signals])
+logs = pd.concat([logs, new_log], ignore_index=True)
+logs.to_csv(log_file, index=False)
 
 # Display the information on Streamlit
 st.title('Bitcoin Technical Analysis and Signal Summary')
 
 st.write('### Support Levels:')
-st.write(f"0.6535, 0.6533, 0.6531")
+st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
 
 st.write('### Resistance Levels:')
-st.write(f"0.6539, 0.6541, 0.6543")
+st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
 
 st.write('### Technical Indicators:')
 for key, value in indicators.items():
@@ -163,6 +176,9 @@ st.write('Buy 🟢' if 'Buy' in signals.values() else 'Sell 🔴')
 
 st.write('### Signal Entry Rules:')
 st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
+
+st.write('### Previous Signals:')
+st.dataframe(logs)
 
 # Add JavaScript to auto-refresh the Streamlit app every 60 seconds
 components.html("""
