@@ -2,8 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
 from nltk.sentiment import SentimentIntensityAnalyzer
 import nltk
 import pytz
@@ -33,7 +31,7 @@ else:
     data.index = data.index.tz_convert(est)
 
 # Calculate technical indicators
-data['RSI'] = data['Close'].rolling(window=14).apply(lambda x: (x/x.shift(1)-1).mean())
+data['RSI'] = data['Close'].rolling(window=14).apply(lambda x: (x/x.shift(1)-1).mean(), raw=False)
 data['BB_Middle'] = data['Close'].rolling(window=20).mean()
 data['BB_Upper'] = data['BB_Middle'] + 2 * data['Close'].rolling(window=20).std()
 data['BB_Lower'] = data['BB_Middle'] - 2 * data['Close'].rolling(window=20).std()
