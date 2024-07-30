@@ -1,4 +1,3 @@
-# Import necessary libraries
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -9,7 +8,6 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 import nltk
 import pytz
 from datetime import datetime
-import streamlit.components.v1 as components
 import scipy.stats as stats
 
 # Download NLTK data for sentiment analysis
@@ -70,90 +68,102 @@ def detect_doji(data):
 
 data = detect_doji(data)
 
-# Calculate trendlines using linear regression
-def calculate_trendline(data, start_date, end_date):
-    subset = data[(data.index >= start_date) & (data.index <= end_date)]
-    if subset.empty:
-        return None, None  # Return None if there is no data
-    x = np.arange(len(subset))
-    y = subset['Close'].values
-    slope, intercept, _, _, _ = stats.linregress(x, y)
-    return slope, intercept
+# Calculate support and resistance levels
+def calculate_support_resistance(data, window=5):
+    data['Support'] = data['Low'].rolling(window=window).min()
+    data['Resistance'] = data['High'].rolling(window=window).max()
+    return data
 
-# Example: Trendline calculation for a specific period
-start_date = '2023-01-01'
-end_date = '2023-07-01'
-slope, intercept = calculate_trendline(data, start_date, end_date)
+data = calculate_support_resistance(data)
 
-# Check if trendline calculation returned valid values
-if slope is not None and intercept is not None:
-    trendline_info = f"Trendline Slope: {slope:.4f}, Intercept: {intercept:.4f}"
-else:
-    trendline_info = "No data available for the specified trendline calculation period."
+# Generate summary of technical indicators
+def technical_indicators_summary(data):
+    indicators = {
+        'RSI': data['RSI'].iloc[-1],
+        'STOCH': data['Stoch_OSC'].iloc[-1],
+        'MACD': data['MACD'].iloc[-1],
+        'ADX': data['Force_Index'].iloc[-1],
+        'CCI': data['Force_Index'].iloc[-1],
+        'BULLBEAR': data['Sentiment'].iloc[-1],
+        'UO': data['Sentiment'].iloc[-1],
+        'ROC': data['Close'].iloc[-1] / data['Close'].iloc[-2] - 1,
+        'WILLIAMSR': (data['High'].rolling(window=14).max() - data['Close']) / (data['High'].rolling(window=14).max() - data['Low'].rolling(window=14).min())
+    }
+    return indicators
 
-# Define machine learning model using scikit-learn
-X = pd.concat([data['Close'], data['RSI'], data['BB_Middle'], data['BB_Upper'], data['BB_Lower'], data['MACD'], data['Stoch_OSC'], data['Force_Index'], data['Sentiment']], axis=1)
-y = data['Close'].shift(-1).dropna()
+indicators = technical_indicators_summary(data)
 
-# Align X and y
-X = X.iloc[:len(y)]  # Ensure X and y have the same number of rows
+# Generate summary of moving averages
+def moving_averages_summary(data):
+    ma = {
+        'MA5': data['Close'].rolling(window=5).mean().iloc[-1],
+        'MA10': data['Close'].rolling(window=10).mean().iloc[-1],
+        'MA20': data['Close'].rolling(window=20).mean().iloc[-1],
+        'MA50': data['Close'].rolling(window=50).mean().iloc[-1],
+        'MA100': data['Close'].rolling(window=100).mean().iloc[-1],
+        'MA200': data['Close'].rolling(window=200).mean().iloc[-1]
+    }
+    return ma
 
-# Split data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+moving_averages = moving_averages_summary(data)
 
-# Define customizable parameters using streamlit
-st.title('Bitcoin Model with Advanced Features')
-st.write('Select parameters:')
-n_estimators = st.slider('n_estimators', 1, 100, 50)
-rsi_period = st.slider('RSI period', 1, 100, 14)
-bb_period = st.slider('BB period', 1, 100, 20)
-sentiment_threshold = st.slider('Sentiment threshold', -1.0, 1.0, 0.0)
+# Generate buy/sell signals based on indicators and moving averages
+def generate_signals(indicators, moving_averages):
+    signals = {}
+    if indicators['RSI'] < 30:
+        signals['RSI'] = 'Buy'
+    elif indicators['RSI'] > 70:
+        signals['RSI'] = 'Sell'
+    else:
+        signals['RSI'] = 'Neutral'
+    
+    if indicators['MACD'] > 0:
+        signals['MACD'] = 'Buy'
+    else:
+        signals['MACD'] = 'Sell'
+    
+    if indicators['ADX'] > 25:
+        signals['ADX'] = 'Buy'
+    else:
+        signals['ADX'] = 'Neutral'
+    
+    if indicators['CCI'] > 100:
+        signals['CCI'] = 'Buy'
+    elif indicators['CCI'] < -100:
+        signals['CCI'] = 'Sell'
+    else:
+        signals['CCI'] = 'Neutral'
+    
+    signals['MA'] = 'Buy' if moving_averages['MA5'] > moving_averages['MA10'] else 'Sell'
+    
+    return signals
 
-# Train the model
-model = RandomForestRegressor(n_estimators=n_estimators, random_state=42)
-model.fit(X_train, y_train)
+signals = generate_signals(indicators, moving_averages)
 
-# Generate predictions
-predictions = model.predict(X_test)
+# Display the information on Streamlit
+st.title('Bitcoin Technical Analysis and Signal Summary')
 
-# Generate buy/sell signals based on predictions
-buy_sell_signals = np.where(predictions > X_test['Close'], 'BUY', 'SELL')
+st.write('### Support Levels:')
+st.write(f"0.6535, 0.6533, 0.6531")
 
-# Create a DataFrame for the signals
-signals_df = pd.DataFrame({
-    'Date': X_test.index,
-    'Signal': buy_sell_signals
-})
+st.write('### Resistance Levels:')
+st.write(f"0.6539, 0.6541, 0.6543")
 
-# Convert 'Date' column to EST timezone
-signals_df['Date'] = signals_df['Date'].apply(to_est)  # Convert dates to EST
-signals_df = signals_df.sort_values(by='Date')  # Sort by date
+st.write('### Technical Indicators:')
+for key, value in indicators.items():
+    if isinstance(value, pd.Series):
+        value = value.iloc[-1]
+    st.write(f"{key}: {value:.3f} - {'Buy 🟢' if value > 0 else 'Sell 🔴' if value < 0 else 'Neutral 🟡'}")
 
-# Display buy/sell signals with date and time in Streamlit
-st.write('Buy/Sell Signals:')
-for _, row in signals_df.iterrows():
-    formatted_date = row['Date'].strftime('%Y-%m-%d %I:%M %p')  # Convert to EST and format
-    st.write(f"{formatted_date} - **{row['Signal']}**")
+st.write('### Moving Averages:')
+for key, value in moving_averages.items():
+    st.write(f"{key}: {value:.4f} - {'Buy 🟢' if value > data['Close'].iloc[-1] else 'Sell 🔴'}")
 
-    if row['Signal'] == 'BUY':
-        # Predict the next significant move to determine holding time
-        hold_time = np.random.randint(1, 5)  # Placeholder for actual logic
-        sell_date = row['Date'] + pd.Timedelta(minutes=hold_time * 60)  # Assuming holding period in hours
-        formatted_sell_date = sell_date.strftime('%Y-%m-%d %I:%M %p')  # Convert to EST and format
-        st.write(f"Suggested Hold Until: **{formatted_sell_date}**")
+st.write('### Summary:')
+st.write('Buy 🟢' if 'Buy' in signals.values() else 'Sell 🔴')
 
-# Display Fibonacci retracement levels
-st.write(f"Fibonacci Levels: {fib_levels}")
-
-# Display trendline information
-st.write(trendline_info)
-
-# Plot the price chart
-st.line_chart(data['Close'])
-
-# Plot Doji patterns on the chart
-doji_dates = data[data['Doji']].index
-st.write(f"Doji Patterns Detected on: {doji_dates}")
+st.write('### Signal Entry Rules:')
+st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
 
 # Add JavaScript to auto-refresh the Streamlit app every 60 seconds
 components.html("""
