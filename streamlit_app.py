@@ -8,6 +8,7 @@ import nltk
 import pytz
 from datetime import datetime
 import scipy.stats as stats
+import plotly.graph_objects as go
 
 # Download NLTK data for sentiment analysis
 nltk.download('vader_lexicon')
@@ -74,6 +75,15 @@ def calculate_support_resistance(data, window=5):
     return data
 
 data = calculate_support_resistance(data)
+
+# Add chart to display support and resistance levels
+st.title('Bitcoin Technical Analysis and Signal Summary')
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close'))
+fig.add_trace(go.Scatter(x=data.index, y=data['Support'], name='Support', line=dict(dash='dash')))
+fig.add_trace(go.Scatter(x=data.index, y=data['Resistance'], name='Resistance', line=dict(dash='dash')))
+fig.update_layout(title='Support and Resistance Levels', xaxis_title='Time', yaxis_title='Price')
+st.plotly_chart(fig)
 
 # Generate summary of technical indicators
 def technical_indicators_summary(data):
@@ -153,8 +163,6 @@ logs = pd.concat([logs, new_log], ignore_index=True)
 logs.to_csv(log_file, index=False)
 
 # Display the information on Streamlit
-st.title('Bitcoin Technical Analysis and Signal Summary')
-
 st.write('### Support Levels:')
 st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
 
@@ -165,14 +173,14 @@ st.write('### Technical Indicators:')
 for key, value in indicators.items():
     if isinstance(value, pd.Series):
         value = value.iloc[-1]
-    st.write(f"{key}: {value:.3f} - {'Buy 🟢' if value > 0 else 'Sell 🔴' if value < 0 else 'Neutral 🟡'}")
+    st.write(f"{key}: {value:.3f} - {'Buy' if value > 0 else 'Sell' if value < 0 else 'Neutral'}")
 
 st.write('### Moving Averages:')
 for key, value in moving_averages.items():
-    st.write(f"{key}: {value:.4f} - {'Buy 🟢' if value > data['Close'].iloc[-1] else 'Sell 🔴'}")
+    st.write(f"{key}: {value:.4f} - {'Buy' if value > data['Close'].iloc[-1] else 'Sell'}")
 
 st.write('### Summary:')
-st.write('Buy 🟢' if 'Buy' in signals.values() else 'Sell 🔴')
+st.write('Buy' if 'Buy' in signals.values() else 'Sell')
 
 st.write('### Signal Entry Rules:')
 st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
