@@ -167,15 +167,13 @@ new_log = pd.DataFrame([signals])
 logs = pd.concat([logs, new_log], ignore_index=True)
 logs.to_csv(log_file, index=False)
 
-# Fetch Fear and Greed Index (replace with actual API or source)
+# Function to fetch Fear and Greed Index (for testing purposes)
 def fetch_fear_and_greed_index():
-    # Example placeholder for fetching data
-    # You need to replace this URL with an actual API endpoint or data source
-    response = requests.get('https://api.example.com/fear-and-greed-index')
-    data = response.json()
-    return data['value']  # Replace with actual key from response
+    # Static value for testing
+    return 50  # Replace this with a dynamic value if available
 
 fear_and_greed_index = fetch_fear_and_greed_index()
+
 
 # Display the information on Streamlit
 st.write('### Support Levels:')
