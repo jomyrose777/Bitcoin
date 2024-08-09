@@ -3,15 +3,10 @@ import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from nltk.sentiment import SentimentIntensityAnalyzer
-import nltk
+import ta
 import pytz
 from datetime import datetime
-import scipy.stats as stats
 import plotly.graph_objects as go
-
-# Download NLTK data for sentiment analysis
-nltk.download('vader_lexicon')
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -32,23 +27,20 @@ if data.index.tzinfo is None:
 else:
     data.index = data.index.tz_convert(est)
 
-# Calculate technical indicators
-data['RSI'] = data['Close'].rolling(window=14).apply(lambda x: (x/x.shift(1)-1).mean(), raw=False)
-data['BB_Middle'] = data['Close'].rolling(window=20).mean()
-data['BB_Upper'] = data['BB_Middle'] + 2 * data['Close'].rolling(window=20).std()
-data['BB_Lower'] = data['BB_Middle'] - 2 * data['Close'].rolling(window=20).std()
-data['MACD'] = data['Close'].ewm(span=12, adjust=False).mean() - data['Close'].ewm(span=26, adjust=False).mean()
-data['Stoch_OSC'] = (data['Close'] - data['Close'].rolling(window=14).min()) / (data['Close'].rolling(window=14).max() - data['Close'].rolling(window=14).min())
-data['Force_Index'] = data['Close'].diff() * data['Volume']
-
-# Perform sentiment analysis using nltk
-sia = SentimentIntensityAnalyzer()
-data['Sentiment'] = data['Close'].apply(lambda x: sia.polarity_scores(str(x))['compound'])
+# Calculate technical indicators using the ta library
+data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
+data['MACD'] = ta.trend.MACD(data['Close']).macd()
+data['MACD_Signal'] = ta.trend.MACD(data['Close']).macd_signal()
+data['STOCH'] = ta.momentum.StochasticOscillator(data['High'], data['Low'], data['Close']).stoch()
+data['ADX'] = ta.trend.ADXIndicator(data['High'], data['Low'], data['Close']).adx()
+data['CCI'] = ta.trend.CCIIndicator(data['High'], data['Low'], data['Close']).cci()
+data['BULLBEAR'] = data['Close'].apply(lambda x: x)  # Replace with actual sentiment if available
+data['UO'] = data['Close'].apply(lambda x: x)  # Replace with actual UO if available
+data['ROC'] = ta.momentum.ROCIndicator(data['Close']).roc()
+data['WILLIAMSR'] = ta.momentum.WilliamsRIndicator(data['High'], data['Low'], data['Close']).williams_r()
 
 # Drop rows with NaN values
 data.dropna(inplace=True)
-
-# Advanced Analysis Functions
 
 # Calculate Fibonacci retracement levels
 def fibonacci_retracement(high, low):
@@ -89,14 +81,14 @@ st.plotly_chart(fig)
 def technical_indicators_summary(data):
     indicators = {
         'RSI': data['RSI'].iloc[-1],
-        'STOCH': data['Stoch_OSC'].iloc[-1],
-        'MACD': data['MACD'].iloc[-1],
-        'ADX': data['Force_Index'].iloc[-1],
-        'CCI': data['Force_Index'].iloc[-1],
-        'BULLBEAR': data['Sentiment'].iloc[-1],
-        'UO': data['Sentiment'].iloc[-1],
-        'ROC': data['Close'].iloc[-1] / data['Close'].iloc[-2] - 1,
-        'WILLIAMSR': (data['High'].rolling(window=14).max() - data['Close']) / (data['High'].rolling(window=14).max() - data['Low'].rolling(window=14).min())
+        'STOCH': data['STOCH'].iloc[-1],
+        'MACD': data['MACD'].iloc[-1] - data['MACD_Signal'].iloc[-1],
+        'ADX': data['ADX'].iloc[-1],
+        'CCI': data['CCI'].iloc[-1],
+        'BULLBEAR': data['BULLBEAR'].iloc[-1],
+        'UO': data['UO'].iloc[-1],
+        'ROC': data['ROC'].iloc[-1],
+        'WILLIAMSR': data['WILLIAMSR'].iloc[-1]
     }
     return indicators
 
@@ -121,6 +113,7 @@ def generate_signals(indicators, moving_averages, data):
     signals = {}
     signals['timestamp'] = to_est(data.index[-1]).strftime('%Y-%m-%d %I:%M:%S %p')
     
+    # RSI Signal
     if indicators['RSI'] < 30:
         signals['RSI'] = 'Buy'
     elif indicators['RSI'] > 70:
@@ -128,16 +121,19 @@ def generate_signals(indicators, moving_averages, data):
     else:
         signals['RSI'] = 'Neutral'
     
+    # MACD Signal
     if indicators['MACD'] > 0:
         signals['MACD'] = 'Buy'
     else:
         signals['MACD'] = 'Sell'
     
+    # ADX Signal
     if indicators['ADX'] > 25:
         signals['ADX'] = 'Buy'
     else:
         signals['ADX'] = 'Neutral'
     
+    # CCI Signal
     if indicators['CCI'] > 100:
         signals['CCI'] = 'Buy'
     elif indicators['CCI'] < -100:
@@ -145,6 +141,7 @@ def generate_signals(indicators, moving_averages, data):
     else:
         signals['CCI'] = 'Neutral'
     
+    # Moving Averages Signal
     signals['MA'] = 'Buy' if moving_averages['MA5'] > moving_averages['MA10'] else 'Sell'
     
     return signals
