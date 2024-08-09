@@ -7,6 +7,7 @@ import ta
 import pytz
 from datetime import datetime
 import plotly.graph_objects as go
+import requests  # For fetching the Fear and Greed Index
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -166,6 +167,16 @@ new_log = pd.DataFrame([signals])
 logs = pd.concat([logs, new_log], ignore_index=True)
 logs.to_csv(log_file, index=False)
 
+# Fetch Fear and Greed Index (replace with actual API or source)
+def fetch_fear_and_greed_index():
+    # Example placeholder for fetching data
+    # You need to replace this URL with an actual API endpoint or data source
+    response = requests.get('https://api.example.com/fear-and-greed-index')
+    data = response.json()
+    return data['value']  # Replace with actual key from response
+
+fear_and_greed_index = fetch_fear_and_greed_index()
+
 # Display the information on Streamlit
 st.write('### Support Levels:')
 st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
@@ -182,6 +193,28 @@ for key, value in indicators.items():
 st.write('### Moving Averages:')
 for key, value in moving_averages.items():
     st.write(f"{key}: {value:.4f} - {'Buy' if value > data['Close'].iloc[-1] else 'Sell'}")
+
+st.write('### Fear and Greed Index:')
+st.write(f"{fear_and_greed_index:.2f}")
+
+# Perpetual Options Trading Decision
+def perpetual_options_decision(signals, fear_and_greed_index):
+    # Consolidated decision rule based on the overall indicators and Fear and Greed Index
+    buy_signals = [signal for signal in signals.values() if signal == 'Buy']
+    sell_signals = [signal for signal in signals.values() if signal == 'Sell']
+    
+    if len(buy_signals) > len(sell_signals) and fear_and_greed_index < 50:
+        return 'Go Long'
+    elif len(sell_signals) > len(buy_signals) and fear_and_greed_index > 50:
+        return 'Go Short'
+    else:
+        return 'Hold'
+
+options_decision = perpetual_options_decision(signals, fear_and_greed_index)
+
+# Display the decision
+st.write('### Perpetual Options Trading Decision:')
+st.write(f"Decision: {options_decision}")
 
 st.write('### Summary:')
 st.write('Buy' if 'Buy' in signals.values() else 'Sell')
