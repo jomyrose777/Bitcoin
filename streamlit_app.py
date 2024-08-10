@@ -9,7 +9,7 @@ from datetime import datetime
 import plotly.graph_objects as go
 import requests
 
-# Define the ticker symbol for Bitcoin
+# Define the ticker symbol for Bitcoin 
 ticker = 'BTC-USD'
 
 # Define the timezone for EST
