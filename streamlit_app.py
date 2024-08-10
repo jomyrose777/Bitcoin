@@ -71,14 +71,9 @@ data = calculate_support_resistance(data)
 # Add chart to display support and resistance levels
 st.title('Bitcoin Technical Analysis and Signal Summary')
 fig = go.Figure()
-
-# Plot the close price
-fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close', line=dict(color='blue')))
-
-# Plot support and resistance levels
-fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Support'].iloc[-1]]*2, name='Support', line=dict(color='green', width=2, dash='dash')))
-fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Resistance'].iloc[-1]]*2, name='Resistance', line=dict(color='red', width=2, dash='dash')))
-
+fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close'))
+fig.add_trace(go.Scatter(x=data.index, y=data['Support'], name='Support', line=dict(dash='dash')))
+fig.add_trace(go.Scatter(x=data.index, y=data['Resistance'], name='Resistance', line=dict(dash='dash')))
 fig.update_layout(title='Support and Resistance Levels', xaxis_title='Time', yaxis_title='Price')
 st.plotly_chart(fig)
 
