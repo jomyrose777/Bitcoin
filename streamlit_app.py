@@ -184,7 +184,6 @@ fear_and_greed_value, fear_and_greed_classification = fetch_fear_and_greed_index
 
 # Generate a perpetual options decision
 def generate_perpetual_options_decision(indicators, moving_averages):
-    # Combine signals to make a decision
     signals = generate_signals(indicators, moving_averages, data)
     
     # Decision logic
@@ -198,64 +197,36 @@ def generate_perpetual_options_decision(indicators, moving_averages):
     else:
         decision = 'Neutral'
     
-    return decision
+    # Entry point based on latest close price
+    entry_point = data['Close'].iloc[-1]
+    
+    return decision, entry_point
 
-# Get perpetual options decision
-options_decision = generate_perpetual_options_decision(indicators, moving_averages)
-
-
-# Display the information on Streamlit
-st.write('### Support Levels:')
-st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
-
-st.write('### Resistance Levels:')
-st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
+# Get perpetual options decision and entry point
+options_decision, entry_point = generate_perpetual_options_decision(indicators, moving_averages)
 
 # Display the information on Streamlit
 st.write('### Support Levels:')
-st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
+st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}, {fib_levels[3]:.4f}, {fib_levels[4]:.4f}")
 
-st.write('### Resistance Levels:')
-st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
+st.write('### Latest Technical Indicators:')
+st.write(indicators)
 
-st.write('### Technical Indicators:')
-for key, value in indicators.items():
-    if isinstance(value, pd.Series):
-        value = value.iloc[-1]
-    st.write(f"{key}: {value:.3f} - {'Buy' if value > 0 else 'Sell' if value < 0 else 'Neutral'}")
+st.write('### Latest Moving Averages:')
+st.write(moving_averages)
 
-st.write('### Moving Averages:')
-for key, value in moving_averages.items():
-    st.write(f"{key}: {value:.4f} - {'Buy' if value > data['Close'].iloc[-1] else 'Sell'}")
+st.write('### Latest Signals:')
+st.write(signals)
 
-st.write('### Summary:')
-st.write('Buy' if 'Buy' in signals.values() else 'Sell')
+st.write(f'### Fear and Greed Index: {fear_and_greed_value} ({fear_and_greed_classification})')
 
-st.write('### Signal Entry Rules:')
-st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
-
-st.write('### Previous Signals:')
-st.dataframe(logs)
-
-# Display the Fear and Greed Index
-st.write('### Fear and Greed Index:')
-st.write(f"Value: {fear_and_greed_value}")
-st.write(f"Classification: {fear_and_greed_classification}")
-
-# Display the perpetual options decision
 st.write('### Perpetual Options Decision:')
-st.write(options_decision)
+st.write(f"Decision: {options_decision}")
+st.write(f"Entry Point: {entry_point:.2f}")
 
-# Display the signal accuracy
-accuracy = calculate_signal_accuracy(logs, signals)
-st.write(f"### Signal Accuracy: {accuracy}")
+# Display signal accuracy
+st.write('### Signal Accuracy:')
+st.write(calculate_signal_accuracy(logs, signals))
 
-# Add JavaScript to auto-refresh the Streamlit app every 60 seconds
-components.html("""
-<script>
-setTimeout(function(){
-   window.location.reload();
-}, 60000);  // Refresh every 60 seconds
-</script>
-""", height=0)
-
+# Optionally add a button to download signals log
+st.download_button('Download Signals Log', data=logs.to_csv(index=False), file_name='signals_log.csv', mime='text/csv')
