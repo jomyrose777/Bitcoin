@@ -7,6 +7,7 @@ import ta
 import pytz
 from datetime import datetime
 import plotly.graph_objects as go
+import requests
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -19,7 +20,7 @@ def to_est(dt):
     return dt.tz_convert(est) if dt.tzinfo else est.localize(dt)
 
 # Fetch live data from Yahoo Finance
-@st.cache_data(ttl=600)  # Cache the data for 10 minutes
+@st.cache
 def fetch_data():
     data = yf.download(ticker, period='1d', interval='1m')
     if data.index.tzinfo is None:
@@ -32,24 +33,20 @@ data = fetch_data()
 
 # Calculate technical indicators using the ta library
 def calculate_indicators(data):
-    indicators = {
-        'RSI': ta.momentum.RSIIndicator(data['Close'], window=14).rsi(),
-        'MACD': ta.trend.MACD(data['Close']).macd(),
-        'MACD_Signal': ta.trend.MACD(data['Close']).macd_signal(),
-        'STOCH': ta.momentum.StochasticOscillator(data['High'], data['Low'], data['Close']).stoch(),
-        'ADX': ta.trend.ADXIndicator(data['High'], data['Low'], data['Close']).adx(),
-        'CCI': ta.trend.CCIIndicator(data['High'], data['Low'], data['Close']).cci(),
-        'ROC': ta.momentum.ROCIndicator(data['Close']).roc(),
-        'WILLIAMSR': ta.momentum.WilliamsRIndicator(data['High'], data['Low'], data['Close']).williams_r()
-    }
-    for key, value in indicators.items():
-        data[key] = value
+    data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
+    data['MACD'] = ta.trend.MACD(data['Close']).macd()
+    data['MACD_Signal'] = ta.trend.MACD(data['Close']).macd_signal()
+    data['STOCH'] = ta.momentum.StochasticOscillator(data['High'], data['Low'], data['Close']).stoch()
+    data['ADX'] = ta.trend.ADXIndicator(data['High'], data['Low'], data['Close']).adx()
+    data['CCI'] = ta.trend.CCIIndicator(data['High'], data['Low'], data['Close']).cci()
+    data['BULLBEAR'] = data['Close'].apply(lambda x: x)  # Replace with actual sentiment if available
+    data['UO'] = data['Close'].apply(lambda x: x)  # Replace with actual UO if available
+    data['ROC'] = ta.momentum.ROCIndicator(data['Close']).roc()
+    data['WILLIAMSR'] = ta.momentum.WilliamsRIndicator(data['High'], data['Low'], data['Close']).williams_r()
+    data.dropna(inplace=True)
     return data
 
 data = calculate_indicators(data)
-
-# Drop rows with NaN values
-data.dropna(inplace=True)
 
 # Calculate Fibonacci retracement levels
 def fibonacci_retracement(high, low):
@@ -63,7 +60,7 @@ fib_levels = fibonacci_retracement(high, low)
 
 # Detect Doji candlestick patterns
 def detect_doji(data):
-    threshold = 0.001  # Define a threshold for identifying Doji
+    threshold = 0.001
     data['Doji'] = abs(data['Close'] - data['Open']) / (data['High'] - data['Low']) < threshold
     return data
 
@@ -80,16 +77,21 @@ data = calculate_support_resistance(data)
 # Add chart to display support and resistance levels
 st.title('Bitcoin Technical Analysis and Signal Summary')
 fig = go.Figure()
-
-# Plot the close price
-fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close', line=dict(color='blue')))
-
-# Plot support and resistance levels
-fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Support'].iloc[-1]]*2, name='Support', line=dict(color='green', width=2, dash='dash')))
-fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Resistance'].iloc[-1]]*2, name='Resistance', line=dict(color='red', width=2, dash='dash')))
-
+fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close'))
+fig.add_trace(go.Scatter(x=data.index, y=data['Support'], name='Support', line=dict(dash='dash')))
+fig.add_trace(go.Scatter(x=data.index, y=data['Resistance'], name='Resistance', line=dict(dash='dash')))
 fig.update_layout(title='Support and Resistance Levels', xaxis_title='Time', yaxis_title='Price')
 st.plotly_chart(fig)
+
+# Fetch Fear and Greed Index
+@st.cache
+def fetch_fear_and_greed():
+    url = 'https://api.alternative.me/fng/'
+    response = requests.get(url)
+    data = response.json()
+    return data['data'][0]['value']
+
+fear_and_greed = fetch_fear_and_greed()
 
 # Generate summary of technical indicators
 def technical_indicators_summary(data):
@@ -99,6 +101,8 @@ def technical_indicators_summary(data):
         'MACD': data['MACD'].iloc[-1] - data['MACD_Signal'].iloc[-1],
         'ADX': data['ADX'].iloc[-1],
         'CCI': data['CCI'].iloc[-1],
+        'BULLBEAR': data['BULLBEAR'].iloc[-1],
+        'UO': data['UO'].iloc[-1],
         'ROC': data['ROC'].iloc[-1],
         'WILLIAMSR': data['WILLIAMSR'].iloc[-1]
     }
@@ -134,10 +138,16 @@ def generate_signals(indicators, moving_averages, data):
         signals['RSI'] = 'Neutral'
     
     # MACD Signal
-    signals['MACD'] = 'Buy' if indicators['MACD'] > 0 else 'Sell'
+    if indicators['MACD'] > 0:
+        signals['MACD'] = 'Buy'
+    else:
+        signals['MACD'] = 'Sell'
     
     # ADX Signal
-    signals['ADX'] = 'Buy' if indicators['ADX'] > 25 else 'Neutral'
+    if indicators['ADX'] > 25:
+        signals['ADX'] = 'Buy'
+    else:
+        signals['ADX'] = 'Neutral'
     
     # CCI Signal
     if indicators['CCI'] > 100:
@@ -150,6 +160,9 @@ def generate_signals(indicators, moving_averages, data):
     # Moving Averages Signal
     signals['MA'] = 'Buy' if moving_averages['MA5'] > moving_averages['MA10'] else 'Sell'
     
+    # Fear and Greed Index Signal
+    signals['Fear and Greed'] = 'Buy' if int(fear_and_greed) < 50 else 'Sell'
+    
     return signals
 
 signals = generate_signals(indicators, moving_averages, data)
@@ -159,7 +172,7 @@ log_file = 'signals_log.csv'
 try:
     logs = pd.read_csv(log_file)
 except FileNotFoundError:
-    logs = pd.DataFrame(columns=['timestamp', 'RSI', 'MACD', 'ADX', 'CCI', 'MA'])
+    logs = pd.DataFrame(columns=['timestamp', 'RSI', 'MACD', 'ADX', 'CCI', 'MA', 'Fear and Greed'])
 
 new_log = pd.DataFrame([signals])
 logs = pd.concat([logs, new_log], ignore_index=True)
@@ -180,6 +193,9 @@ st.write('### Moving Averages:')
 for key, value in moving_averages.items():
     st.write(f"{key}: {value:.4f} - {'Buy' if value > data['Close'].iloc[-1] else 'Sell'}")
 
+st.write('### Fear and Greed Index:')
+st.write(f"{fear_and_greed} - {'Buy' if int(fear_and_greed) < 50 else 'Sell'}")
+
 st.write('### Summary:')
 st.write('Buy' if 'Buy' in signals.values() else 'Sell')
 
@@ -189,11 +205,27 @@ st.write("Enter the signal during one minute. If the price goes the opposite way
 st.write('### Previous Signals:')
 st.dataframe(logs)
 
-# Add JavaScript to auto-refresh the Streamlit app every 60 seconds
-components.html("""
-<script>
-setTimeout(function(){
-   window.location.reload();
-}, 60000);  // Refresh every 60 seconds
-</script>
-""", height=0)
+# Example of Perpetual Options Strategy
+# Note: This is a simplified version. A more robust strategy should be used based on detailed analysis.
+def perpetual_options_strategy(data):
+    current_price = data['Close'].iloc[-1]
+    if signals['MACD'] == 'Buy' and signals['RSI'] == 'Buy':
+        return 'Consider Long Position in Perpetual Options'
+    elif signals['MACD'] == 'Sell' and signals['RSI'] == 'Sell':
+        return 'Consider Short Position in Perpetual Options'
+    else:
+        return 'Hold or Wait for Clearer Signals'
+
+options_signal = perpetual_options_strategy(data)
+st.write(f'### Perpetual Options Strategy: {options_signal}')
+
+# Calculate accuracy of signals
+def calculate_signal_accuracy(logs):
+    total_signals = len(logs)
+    correct_signals = logs.apply(lambda x: (x['RSI'] == 'Buy' and x['MACD'] == 'Buy') or (x['RSI'] == 'Sell' and x['MACD'] == 'Sell'), axis=1).sum()
+    accuracy = (correct_signals / total_signals) * 100 if total_signals > 0 else 0
+    return accuracy
+
+accuracy = calculate_signal_accuracy(logs)
+st.write(f'### Signal Accuracy: {accuracy:.2f}%')
+
