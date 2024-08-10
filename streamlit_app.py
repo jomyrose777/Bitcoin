@@ -7,6 +7,7 @@ import ta
 import pytz
 from datetime import datetime
 import plotly.graph_objects as go
+import requests
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -148,6 +149,18 @@ def generate_signals(indicators, moving_averages, data):
 
 signals = generate_signals(indicators, moving_averages, data)
 
+# Calculate signal accuracy
+def calculate_signal_accuracy(logs, signals):
+    # This is a placeholder for accuracy calculation
+    # You might need a more sophisticated method depending on the trading strategy
+    if len(logs) == 0:
+        return 'N/A'
+    last_signal = logs.iloc[-1]
+    accurate_signals = sum([last_signal[key] == signals[key] for key in signals if key in last_signal])
+    total_signals = len(signals)
+    accuracy = (accurate_signals / total_signals) * 100
+    return f"{accuracy:.2f}%"
+
 # Log signals
 log_file = 'signals_log.csv'
 try:
@@ -158,6 +171,34 @@ except FileNotFoundError:
 new_log = pd.DataFrame([signals])
 logs = pd.concat([logs, new_log], ignore_index=True)
 logs.to_csv(log_file, index=False)
+
+# Fetch Fear and Greed Index
+def fetch_fear_and_greed_index():
+    url = "https://api.alternative.me/fng/"
+    response = requests.get(url)
+    data = response.json()
+    latest_data = data['data'][0]
+    return latest_data['value'], latest_data['value_classification']
+
+fear_and_greed_value, fear_and_greed_classification = fetch_fear_and_greed_index()
+
+# Generate perpetual options decision
+def perpetual_options_decision(data):
+    # Basic example decision-making based on current price
+    current_price = data['Close'].iloc[-1]
+    if current_price > moving_averages['MA50']:
+        return 'Consider Buying Perpetual Options'
+    else:
+        return 'Consider Selling Perpetual Options'
+
+options_decision = perpetual_options_decision(data)
+
+# Display the information on Streamlit
+st.write('### Support Levels:')
+st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
+
+st.write('### Resistance Levels:')
+st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
 
 # Display the information on Streamlit
 st.write('### Support Levels:')
@@ -185,6 +226,19 @@ st.write("Enter the signal during one minute. If the price goes the opposite way
 st.write('### Previous Signals:')
 st.dataframe(logs)
 
+# Display the Fear and Greed Index
+st.write('### Fear and Greed Index:')
+st.write(f"Value: {fear_and_greed_value}")
+st.write(f"Classification: {fear_and_greed_classification}")
+
+# Display the perpetual options decision
+st.write('### Perpetual Options Decision:')
+st.write(options_decision)
+
+# Display the signal accuracy
+accuracy = calculate_signal_accuracy(logs, signals)
+st.write(f"### Signal Accuracy: {accuracy}")
+
 # Add JavaScript to auto-refresh the Streamlit app every 60 seconds
 components.html("""
 <script>
@@ -193,3 +247,4 @@ setTimeout(function(){
 }, 60000);  // Refresh every 60 seconds
 </script>
 """, height=0)
+
