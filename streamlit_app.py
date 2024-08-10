@@ -82,8 +82,8 @@ st.plotly_chart(fig)
 def technical_indicators_summary(data):
     indicators = {
         'RSI': data['RSI'].iloc[-1],
-        'STOCH': data['STOCH'].iloc[-1],
         'MACD': data['MACD'].iloc[-1] - data['MACD_Signal'].iloc[-1],
+        'STOCH': data['STOCH'].iloc[-1],
         'ADX': data['ADX'].iloc[-1],
         'CCI': data['CCI'].iloc[-1],
         'BULLBEAR': data['BULLBEAR'].iloc[-1],
@@ -207,7 +207,15 @@ options_decision, entry_point = generate_perpetual_options_decision(indicators, 
 
 # Display the information on Streamlit
 st.write('### Support Levels:')
-st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}, {fib_levels[3]:.4f}, {fib_levels[4]:.4f}")
+st.write(f"Support Levels: {data['Support'].iloc[-1]:.2f}")
+st.write(f"Resistance Levels: {data['Resistance'].iloc[-1]:.2f}")
+
+st.write('### Fibonacci Retracement Levels:')
+st.write(f"0.236: {fib_levels[0]:.4f}")
+st.write(f"0.382: {fib_levels[1]:.4f}")
+st.write(f"0.5: {fib_levels[2]:.4f}")
+st.write(f"0.618: {fib_levels[3]:.4f}")
+st.write(f"0.786: {fib_levels[4]:.4f}")
 
 st.write('### Latest Technical Indicators:')
 st.write(indicators)
