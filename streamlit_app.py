@@ -69,7 +69,7 @@ def calculate_support_resistance(data, window=5):
 
 data = calculate_support_resistance(data)
 
-# Add chart to display support and resistance levels
+# Plot support and resistance levels
 st.title('Bitcoin Technical Analysis and Signal Summary')
 fig = go.Figure()
 
@@ -174,7 +174,6 @@ def fetch_fear_and_greed_index():
 
 fear_and_greed_index = fetch_fear_and_greed_index()
 
-
 # Display the information on Streamlit
 st.write('### Support Levels:')
 st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
@@ -184,8 +183,6 @@ st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
 
 st.write('### Technical Indicators:')
 for key, value in indicators.items():
-    if isinstance(value, pd.Series):
-        value = value.iloc[-1]
     st.write(f"{key}: {value:.3f} - {'Buy' if value > 0 else 'Sell' if value < 0 else 'Neutral'}")
 
 st.write('### Moving Averages:')
@@ -197,7 +194,6 @@ st.write(f"{fear_and_greed_index:.2f}")
 
 # Perpetual Options Trading Decision
 def perpetual_options_decision(signals, fear_and_greed_index):
-    # Consolidated decision rule based on the overall indicators and Fear and Greed Index
     buy_signals = [signal for signal in signals.values() if signal == 'Buy']
     sell_signals = [signal for signal in signals.values() if signal == 'Sell']
     
@@ -211,23 +207,5 @@ def perpetual_options_decision(signals, fear_and_greed_index):
 options_decision = perpetual_options_decision(signals, fear_and_greed_index)
 
 # Display the decision
-st.write('### Perpetual Options Trading Decision:')
-st.write(f"Decision: {options_decision}")
-
-st.write('### Summary:')
-st.write('Buy' if 'Buy' in signals.values() else 'Sell')
-
-st.write('### Signal Entry Rules:')
-st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
-
-st.write('### Previous Signals:')
-st.dataframe(logs)
-
-# Add JavaScript to auto-refresh the Streamlit app every 60 seconds
-components.html("""
-<script>
-setTimeout(function(){
-   window.location.reload();
-}, 60000);  // Refresh every 60 seconds
-</script>
-""", height=0)
+st.write('### Trading Decision:')
+st.write(options_decision)
