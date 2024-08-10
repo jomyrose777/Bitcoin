@@ -5,3 +5,6 @@ scikit-learn
 pytz
 plotly
 ta
+requests
+pandas
+numpy
