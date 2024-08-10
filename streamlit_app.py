@@ -183,27 +183,43 @@ def fetch_fear_and_greed_index():
 fear_and_greed_value, fear_and_greed_classification = fetch_fear_and_greed_index()
 
 # Generate a perpetual options decision
-def generate_perpetual_options_decision(indicators, moving_averages):
+def generate_perpetual_options_decision(indicators, moving_averages, volatility):
     signals = generate_signals(indicators, moving_averages, data)
     
-    # Decision logic
-    buy_signals = [value for key, value in signals.items() if value == 'Buy']
-    sell_signals = [value for key, value in signals.items() if value == 'Sell']
-    
-    if len(buy_signals) > len(sell_signals):
-        decision = 'Go Long'
-    elif len(sell_signals) > len(buy_signals):
-        decision = 'Go Short'
+    # Example options theory application:
+    # Assess overall market sentiment and volatility
+    if volatility > 0.3:  # This is an example threshold; adjust as needed
+        options_signal = 'Volatile Market: Be Cautious'
     else:
-        decision = 'Neutral'
+        buy_signals = [value for key, value in signals.items() if value == 'Buy']
+        sell_signals = [value for key, value in signals.items() if value == 'Sell']
+        
+        if len(buy_signals) > len(sell_signals):
+            options_signal = 'Go Long'
+        elif len(sell_signals) > len(buy_signals):
+            options_signal = 'Go Short'
+        else:
+            options_signal = 'Neutral'
     
     # Entry point based on latest close price
     entry_point = data['Close'].iloc[-1]
     
-    return decision, entry_point
+    return options_signal, entry_point
 
-# Get perpetual options decision and entry point
-options_decision, entry_point = generate_perpetual_options_decision(indicators, moving_averages)
+# Example of volatility retrieval function (for demonstration purposes)
+def fetch_volatility():
+    # Replace with actual API or calculation for implied/realized volatility
+    return np.random.uniform(0.1, 0.5)
+
+# Get perpetual options decision and entry point with volatility
+volatility = fetch_volatility()
+options_decision, entry_point = generate_perpetual_options_decision(indicators, moving_averages, volatility)
+
+# Display updated perpetual options decision
+st.write('### Perpetual Options Decision:')
+st.write(f"Decision: {options_decision}")
+st.write(f"Entry Point: {entry_point:.2f}")
+
 
 # Display the information on Streamlit
 st.write('### Support Levels:')
