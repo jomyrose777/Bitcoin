@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -8,6 +7,10 @@ import pytz
 from datetime import datetime
 import plotly.graph_objects as go
 import requests
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -22,14 +25,22 @@ def to_est(dt):
 # Fetch live data from Yahoo Finance
 @st.cache
 def fetch_data():
-    data = yf.download(ticker, period='1d', interval='1m')
-    if data.index.tzinfo is None:
-        data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
-    else:
-        data.index = data.index.tz_convert(est)
-    return data
+    try:
+        data = yf.download(ticker, period='1d', interval='1m')
+        if data.index.tzinfo is None:
+            data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
+        else:
+            data.index = data.index.tz_convert(est)
+        return data
+    except Exception as e:
+        logging.error(f"Error fetching data: {e}")
+        st.error("Error fetching data. Please try again later.")
+        return pd.DataFrame()  # Return an empty DataFrame in case of error
 
 data = fetch_data()
+
+if data.empty:
+    st.stop()
 
 # Calculate technical indicators using the ta library
 def calculate_indicators(data):
@@ -86,10 +97,15 @@ st.plotly_chart(fig)
 # Fetch Fear and Greed Index
 @st.cache
 def fetch_fear_and_greed():
-    url = 'https://api.alternative.me/fng/'
-    response = requests.get(url)
-    data = response.json()
-    return data['data'][0]['value']
+    try:
+        url = 'https://api.alternative.me/fng/'
+        response = requests.get(url)
+        data = response.json()
+        return data['data'][0]['value']
+    except Exception as e:
+        logging.error(f"Error fetching Fear and Greed Index: {e}")
+        st.error("Error fetching Fear and Greed Index. Please try again later.")
+        return 'N/A'
 
 fear_and_greed = fetch_fear_and_greed()
 
@@ -191,22 +207,12 @@ for key, value in indicators.items():
 
 st.write('### Moving Averages:')
 for key, value in moving_averages.items():
-    st.write(f"{key}: {value:.4f} - {'Buy' if value > data['Close'].iloc[-1] else 'Sell'}")
+    st.write(f"{key}: {value:.3f}")
 
-st.write('### Fear and Greed Index:')
-st.write(f"{fear_and_greed} - {'Buy' if int(fear_and_greed) < 50 else 'Sell'}")
+st.write(f'### Fear and Greed Index: {fear_and_greed}')
+st.write(f'### Current Signal Summary: {signals}')
 
-st.write('### Summary:')
-st.write('Buy' if 'Buy' in signals.values() else 'Sell')
-
-st.write('### Signal Entry Rules:')
-st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
-
-st.write('### Previous Signals:')
-st.dataframe(logs)
-
-# Example of Perpetual Options Strategy
-# Note: This is a simplified version. A more robust strategy should be used based on detailed analysis.
+# Perpetual Options Strategy
 def perpetual_options_strategy(data):
     current_price = data['Close'].iloc[-1]
     if signals['MACD'] == 'Buy' and signals['RSI'] == 'Buy':
@@ -228,4 +234,3 @@ def calculate_signal_accuracy(logs):
 
 accuracy = calculate_signal_accuracy(logs)
 st.write(f'### Signal Accuracy: {accuracy:.2f}%')
-
