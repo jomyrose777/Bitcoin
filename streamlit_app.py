@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -6,11 +7,6 @@ import ta
 import pytz
 from datetime import datetime
 import plotly.graph_objects as go
-import logging
-import time
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -22,38 +18,24 @@ est = pytz.timezone('America/New_York')
 def to_est(dt):
     return dt.tz_convert(est) if dt.tzinfo else est.localize(dt)
 
-# Fetch live data from Yahoo Finance with retries
-@st.cache
-def fetch_data():
-    retries = 3
-    for attempt in range(retries):
-        try:
-            data = yf.download(ticker, period='1d', interval='1m')
-            if data.index.tzinfo is None:
-                data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
-            else:
-                data.index = data.index.tz_convert(est)
-            return data
-        except Exception as e:
-            logging.error(f"Error fetching data: {e}")
-            time.sleep(5)  # Wait before retrying
-    st.error("Error fetching data after multiple attempts. Please try again later.")
-    return pd.DataFrame()  # Return an empty DataFrame in case of error
+# Fetch live data from Yahoo Finance
+data = yf.download(ticker, period='1d', interval='1m')
 
-# Fetch data
-data = fetch_data()
-if data.empty:
-    st.stop()
+# Convert index to EST if it's not already timezone-aware
+if data.index.tzinfo is None:
+    data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
+else:
+    data.index = data.index.tz_convert(est)
 
-# Calculate technical indicators
+# Calculate technical indicators using the ta library
 data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
 data['MACD'] = ta.trend.MACD(data['Close']).macd()
 data['MACD_Signal'] = ta.trend.MACD(data['Close']).macd_signal()
 data['STOCH'] = ta.momentum.StochasticOscillator(data['High'], data['Low'], data['Close']).stoch()
 data['ADX'] = ta.trend.ADXIndicator(data['High'], data['Low'], data['Close']).adx()
 data['CCI'] = ta.trend.CCIIndicator(data['High'], data['Low'], data['Close']).cci()
-data['BULLBEAR'] = data['Close']  # Placeholder for sentiment data
-data['UO'] = data['Close']  # Placeholder for UO data
+data['BULLBEAR'] = data['Close'].apply(lambda x: x)  # Replace with actual sentiment if available
+data['UO'] = data['Close'].apply(lambda x: x)  # Replace with actual UO if available
 data['ROC'] = ta.momentum.ROCIndicator(data['Close']).roc()
 data['WILLIAMSR'] = ta.momentum.WilliamsRIndicator(data['High'], data['Low'], data['Close']).williams_r()
 
@@ -72,7 +54,7 @@ fib_levels = fibonacci_retracement(high, low)
 
 # Detect Doji candlestick patterns
 def detect_doji(data):
-    threshold = 0.001
+    threshold = 0.001  # Define a threshold for identifying Doji
     data['Doji'] = abs(data['Close'] - data['Open']) / (data['High'] - data['Low']) < threshold
     return data
 
@@ -95,13 +77,6 @@ fig.add_trace(go.Scatter(x=data.index, y=data['Resistance'], name='Resistance', 
 fig.update_layout(title='Support and Resistance Levels', xaxis_title='Time', yaxis_title='Price')
 st.plotly_chart(fig)
 
-# Fetch and analyze Fear and Greed Index
-def fetch_fear_and_greed_index():
-    # Replace with actual implementation to fetch the Fear and Greed Index
-    return np.random.randint(0, 100)  # Placeholder for actual index value
-
-fear_and_greed_index = fetch_fear_and_greed_index()
-
 # Generate summary of technical indicators
 def technical_indicators_summary(data):
     indicators = {
@@ -113,8 +88,7 @@ def technical_indicators_summary(data):
         'BULLBEAR': data['BULLBEAR'].iloc[-1],
         'UO': data['UO'].iloc[-1],
         'ROC': data['ROC'].iloc[-1],
-        'WILLIAMSR': data['WILLIAMSR'].iloc[-1],
-        'Fear and Greed Index': fear_and_greed_index
+        'WILLIAMSR': data['WILLIAMSR'].iloc[-1]
     }
     return indicators
 
@@ -170,12 +144,6 @@ def generate_signals(indicators, moving_averages, data):
     # Moving Averages Signal
     signals['MA'] = 'Buy' if moving_averages['MA5'] > moving_averages['MA10'] else 'Sell'
     
-    # Fear and Greed Signal
-    if indicators['Fear and Greed Index'] > 50:
-        signals['Fear and Greed'] = 'Buy'
-    else:
-        signals['Fear and Greed'] = 'Sell'
-    
     return signals
 
 signals = generate_signals(indicators, moving_averages, data)
@@ -185,18 +153,43 @@ log_file = 'signals_log.csv'
 try:
     logs = pd.read_csv(log_file)
 except FileNotFoundError:
-    logs = pd.DataFrame(columns=['timestamp', 'RSI', 'MACD', 'ADX', 'CCI', 'MA', 'Fear and Greed'])
+    logs = pd.DataFrame(columns=['timestamp', 'RSI', 'MACD', 'ADX', 'CCI', 'MA'])
 
 new_log = pd.DataFrame([signals])
 logs = pd.concat([logs, new_log], ignore_index=True)
 logs.to_csv(log_file, index=False)
 
-# Display the indicators and signals
-st.subheader('Technical Indicators Summary')
-st.write(indicators)
+# Display the information on Streamlit
+st.write('### Support Levels:')
+st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
 
-st.subheader('Moving Averages Summary')
-st.write(moving_averages)
+st.write('### Resistance Levels:')
+st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
 
-st.subheader('Generated Signals')
-st.write(signals)
+st.write('### Technical Indicators:')
+for key, value in indicators.items():
+    if isinstance(value, pd.Series):
+        value = value.iloc[-1]
+    st.write(f"{key}: {value:.3f} - {'Buy' if value > 0 else 'Sell' if value < 0 else 'Neutral'}")
+
+st.write('### Moving Averages:')
+for key, value in moving_averages.items():
+    st.write(f"{key}: {value:.4f} - {'Buy' if value > data['Close'].iloc[-1] else 'Sell'}")
+
+st.write('### Summary:')
+st.write('Buy' if 'Buy' in signals.values() else 'Sell')
+
+st.write('### Signal Entry Rules:')
+st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
+
+st.write('### Previous Signals:')
+st.dataframe(logs)
+
+# Add JavaScript to auto-refresh the Streamlit app every 60 seconds
+components.html("""
+<script>
+setTimeout(function(){
+   window.location.reload();
+}, 60000);  // Refresh every 60 seconds
+</script>
+""", height=0)
