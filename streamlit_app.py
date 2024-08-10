@@ -9,12 +9,17 @@ import plotly.graph_objects as go
 import logging
 import time
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import nltk
 
 # Ensure NLTK data is available
-try:
-    nltk.data.find('sentiment/vader_lexicon.zip')
-except LookupError:
-    nltk.download('vader_lexicon')
+def ensure_nltk_data():
+    try:
+        nltk.data.find('sentiment/vader_lexicon.zip')
+    except LookupError:
+        nltk.download('vader_lexicon')
+
+# Ensure NLTK data is downloaded
+ensure_nltk_data()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
