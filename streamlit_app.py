@@ -7,7 +7,6 @@ import ta
 import pytz
 from datetime import datetime
 import plotly.graph_objects as go
-import requests  # For fetching the Fear and Greed Index
 
 # Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
@@ -69,20 +68,18 @@ def calculate_support_resistance(data, window=5):
 
 data = calculate_support_resistance(data)
 
-# Plot support and resistance levels
+# Add chart to display support and resistance levels
 st.title('Bitcoin Technical Analysis and Signal Summary')
 fig = go.Figure()
 
 # Plot the close price
 fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close', line=dict(color='blue')))
 
-# Plot the support and resistance levels
-fig.add_trace(go.Scatter(x=data.index, y=data['Support'], name='Support', line=dict(color='green', width=2, dash='dash')))
-fig.add_trace(go.Scatter(x=data.index, y=data['Resistance'], name='Resistance', line=dict(color='red', width=2, dash='dash')))
+# Plot support and resistance levels
+fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Support'].iloc[-1]]*2, name='Support', line=dict(color='green', width=2, dash='dash')))
+fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Resistance'].iloc[-1]]*2, name='Resistance', line=dict(color='red', width=2, dash='dash')))
 
 fig.update_layout(title='Support and Resistance Levels', xaxis_title='Time', yaxis_title='Price')
-
-# Display the chart
 st.plotly_chart(fig)
 
 # Generate summary of technical indicators
@@ -167,13 +164,6 @@ new_log = pd.DataFrame([signals])
 logs = pd.concat([logs, new_log], ignore_index=True)
 logs.to_csv(log_file, index=False)
 
-# Function to fetch Fear and Greed Index (for testing purposes)
-def fetch_fear_and_greed_index():
-    # Static value for testing
-    return 50  # Replace this with a dynamic value if available
-
-fear_and_greed_index = fetch_fear_and_greed_index()
-
 # Display the information on Streamlit
 st.write('### Support Levels:')
 st.write(f"{fib_levels[0]:.4f}, {fib_levels[1]:.4f}, {fib_levels[2]:.4f}")
@@ -183,29 +173,28 @@ st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
 
 st.write('### Technical Indicators:')
 for key, value in indicators.items():
+    if isinstance(value, pd.Series):
+        value = value.iloc[-1]
     st.write(f"{key}: {value:.3f} - {'Buy' if value > 0 else 'Sell' if value < 0 else 'Neutral'}")
 
 st.write('### Moving Averages:')
 for key, value in moving_averages.items():
     st.write(f"{key}: {value:.4f} - {'Buy' if value > data['Close'].iloc[-1] else 'Sell'}")
 
-st.write('### Fear and Greed Index:')
-st.write(f"{fear_and_greed_index:.2f}")
+st.write('### Summary:')
+st.write('Buy' if 'Buy' in signals.values() else 'Sell')
 
-# Perpetual Options Trading Decision
-def perpetual_options_decision(signals, fear_and_greed_index):
-    buy_signals = [signal for signal in signals.values() if signal == 'Buy']
-    sell_signals = [signal for signal in signals.values() if signal == 'Sell']
-    
-    if len(buy_signals) > len(sell_signals) and fear_and_greed_index < 50:
-        return 'Go Long'
-    elif len(sell_signals) > len(buy_signals) and fear_and_greed_index > 50:
-        return 'Go Short'
-    else:
-        return 'Hold'
+st.write('### Signal Entry Rules:')
+st.write("Enter the signal during one minute. If the price goes the opposite way, enter from the price rollback or from support/resistance points. Don't forget about risk and money management: do not bet more than 5% of the deposit even with possible overlaps!")
 
-options_decision = perpetual_options_decision(signals, fear_and_greed_index)
+st.write('### Previous Signals:')
+st.dataframe(logs)
 
-# Display the decision
-st.write('### Trading Decision:')
-st.write(options_decision)
+# Add JavaScript to auto-refresh the Streamlit app every 60 seconds
+components.html("""
+<script>
+setTimeout(function(){
+   window.location.reload();
+}, 60000);  // Refresh every 60 seconds
+</script>
+""", height=0)
