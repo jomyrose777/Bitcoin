@@ -19,25 +19,34 @@ def to_est(dt):
     return dt.tz_convert(est) if dt.tzinfo else est.localize(dt)
 
 # Fetch live data from Yahoo Finance
-data = yf.download(ticker, period='1d', interval='1m')
+@st.cache_data(ttl=600)  # Cache the data for 10 minutes
+def fetch_data():
+    data = yf.download(ticker, period='1d', interval='1m')
+    if data.index.tzinfo is None:
+        data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
+    else:
+        data.index = data.index.tz_convert(est)
+    return data
 
-# Convert index to EST if it's not already timezone-aware
-if data.index.tzinfo is None:
-    data.index = data.index.tz_localize(pytz.utc).tz_convert(est)
-else:
-    data.index = data.index.tz_convert(est)
+data = fetch_data()
 
 # Calculate technical indicators using the ta library
-data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-data['MACD'] = ta.trend.MACD(data['Close']).macd()
-data['MACD_Signal'] = ta.trend.MACD(data['Close']).macd_signal()
-data['STOCH'] = ta.momentum.StochasticOscillator(data['High'], data['Low'], data['Close']).stoch()
-data['ADX'] = ta.trend.ADXIndicator(data['High'], data['Low'], data['Close']).adx()
-data['CCI'] = ta.trend.CCIIndicator(data['High'], data['Low'], data['Close']).cci()
-data['BULLBEAR'] = data['Close'].apply(lambda x: x)  # Replace with actual sentiment if available
-data['UO'] = data['Close'].apply(lambda x: x)  # Replace with actual UO if available
-data['ROC'] = ta.momentum.ROCIndicator(data['Close']).roc()
-data['WILLIAMSR'] = ta.momentum.WilliamsRIndicator(data['High'], data['Low'], data['Close']).williams_r()
+def calculate_indicators(data):
+    indicators = {
+        'RSI': ta.momentum.RSIIndicator(data['Close'], window=14).rsi(),
+        'MACD': ta.trend.MACD(data['Close']).macd(),
+        'MACD_Signal': ta.trend.MACD(data['Close']).macd_signal(),
+        'STOCH': ta.momentum.StochasticOscillator(data['High'], data['Low'], data['Close']).stoch(),
+        'ADX': ta.trend.ADXIndicator(data['High'], data['Low'], data['Close']).adx(),
+        'CCI': ta.trend.CCIIndicator(data['High'], data['Low'], data['Close']).cci(),
+        'ROC': ta.momentum.ROCIndicator(data['Close']).roc(),
+        'WILLIAMSR': ta.momentum.WilliamsRIndicator(data['High'], data['Low'], data['Close']).williams_r()
+    }
+    for key, value in indicators.items():
+        data[key] = value
+    return data
+
+data = calculate_indicators(data)
 
 # Drop rows with NaN values
 data.dropna(inplace=True)
@@ -71,9 +80,14 @@ data = calculate_support_resistance(data)
 # Add chart to display support and resistance levels
 st.title('Bitcoin Technical Analysis and Signal Summary')
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close'))
-fig.add_trace(go.Scatter(x=data.index, y=data['Support'], name='Support', line=dict(dash='dash')))
-fig.add_trace(go.Scatter(x=data.index, y=data['Resistance'], name='Resistance', line=dict(dash='dash')))
+
+# Plot the close price
+fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='Close', line=dict(color='blue')))
+
+# Plot support and resistance levels
+fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Support'].iloc[-1]]*2, name='Support', line=dict(color='green', width=2, dash='dash')))
+fig.add_trace(go.Scatter(x=[data.index[0], data.index[-1]], y=[data['Resistance'].iloc[-1]]*2, name='Resistance', line=dict(color='red', width=2, dash='dash')))
+
 fig.update_layout(title='Support and Resistance Levels', xaxis_title='Time', yaxis_title='Price')
 st.plotly_chart(fig)
 
@@ -85,8 +99,6 @@ def technical_indicators_summary(data):
         'MACD': data['MACD'].iloc[-1] - data['MACD_Signal'].iloc[-1],
         'ADX': data['ADX'].iloc[-1],
         'CCI': data['CCI'].iloc[-1],
-        'BULLBEAR': data['BULLBEAR'].iloc[-1],
-        'UO': data['UO'].iloc[-1],
         'ROC': data['ROC'].iloc[-1],
         'WILLIAMSR': data['WILLIAMSR'].iloc[-1]
     }
@@ -122,16 +134,10 @@ def generate_signals(indicators, moving_averages, data):
         signals['RSI'] = 'Neutral'
     
     # MACD Signal
-    if indicators['MACD'] > 0:
-        signals['MACD'] = 'Buy'
-    else:
-        signals['MACD'] = 'Sell'
+    signals['MACD'] = 'Buy' if indicators['MACD'] > 0 else 'Sell'
     
     # ADX Signal
-    if indicators['ADX'] > 25:
-        signals['ADX'] = 'Buy'
-    else:
-        signals['ADX'] = 'Neutral'
+    signals['ADX'] = 'Buy' if indicators['ADX'] > 25 else 'Neutral'
     
     # CCI Signal
     if indicators['CCI'] > 100:
@@ -168,8 +174,6 @@ st.write(f"{fib_levels[3]:.4f}, {fib_levels[4]:.4f}, {high:.4f}")
 
 st.write('### Technical Indicators:')
 for key, value in indicators.items():
-    if isinstance(value, pd.Series):
-        value = value.iloc[-1]
     st.write(f"{key}: {value:.3f} - {'Buy' if value > 0 else 'Sell' if value < 0 else 'Neutral'}")
 
 st.write('### Moving Averages:')
