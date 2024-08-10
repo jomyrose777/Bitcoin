@@ -182,16 +182,27 @@ def fetch_fear_and_greed_index():
 
 fear_and_greed_value, fear_and_greed_classification = fetch_fear_and_greed_index()
 
-# Generate perpetual options decision
-def perpetual_options_decision(data):
-    # Basic example decision-making based on current price
-    current_price = data['Close'].iloc[-1]
-    if current_price > moving_averages['MA50']:
-        return 'Consider Buying Perpetual Options'
+# Generate a perpetual options decision
+def generate_perpetual_options_decision(indicators, moving_averages):
+    # Combine signals to make a decision
+    signals = generate_signals(indicators, moving_averages, data)
+    
+    # Decision logic
+    buy_signals = [value for key, value in signals.items() if value == 'Buy']
+    sell_signals = [value for key, value in signals.items() if value == 'Sell']
+    
+    if len(buy_signals) > len(sell_signals):
+        decision = 'Go Long'
+    elif len(sell_signals) > len(buy_signals):
+        decision = 'Go Short'
     else:
-        return 'Consider Selling Perpetual Options'
+        decision = 'Neutral'
+    
+    return decision
 
-options_decision = perpetual_options_decision(data)
+# Get perpetual options decision
+options_decision = generate_perpetual_options_decision(indicators, moving_averages)
+
 
 # Display the information on Streamlit
 st.write('### Support Levels:')
