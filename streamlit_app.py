@@ -9,7 +9,7 @@ from datetime import datetime
 import plotly.graph_objects as go
 import requests
 
-# Define the ticker symbol for Bitcoin 
+# Define the ticker symbol for Bitcoin
 ticker = 'BTC-USD'
 
 # Define the timezone for EST
@@ -227,6 +227,10 @@ st.write(f"Entry Point: {entry_point:.2f}")
 # Display signal accuracy
 st.write('### Signal Accuracy:')
 st.write(calculate_signal_accuracy(logs, signals))
+
+# Display all signals results in a table
+st.write('### All Signals Results:')
+st.dataframe(logs)
 
 # Optionally add a button to download signals log
 st.download_button('Download Signals Log', data=logs.to_csv(index=False), file_name='signals_log.csv', mime='text/csv')
